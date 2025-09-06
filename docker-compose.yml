@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: finance_postgres
+    env_file:
+      - ".env"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-finance_user} -d ${POSTGRES_DB:-finance_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - finance_network
+
+  redis:
+    image: redis:alpine
+    container_name: finance_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - finance_network
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finance_app
+    volumes:
+      - .:/finance_manager
+    ports:
+      - "8000:8000"
+    env_file:
+      - ".env"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - finance_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  finance_network:
+    driver: bridge
